@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Módulo de Manuales - EC0301</title>
+
+    <script src="sistema_central/auth.js" defer></script>
+    <script src="sistema_central/ec0301-data-manager.js" defer></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        /* (Reutilizamos los estilos de logística.html y carta_descriptiva.html) */
+        :root {
+            --primary: #1E3A8A; --accent: #FF6B35; --success: #22C55E; --warning: #F59E0B;
+            --danger: #EF4444; --light: #F8FAFC; --border: #E5E7EB; --text: #1F2937; --muted: #6B7280;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #F1F5F9; color: var(--text); line-height: 1.7;
+        }
+        .header {
+            background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky; top: 0; z-index: 1000; border-bottom: 3px solid var(--accent);
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
+        .header-content {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 1rem;
+        }
+        h1 { font-size: 1.75rem; color: var(--primary); display: flex; align-items: center; gap: 0.75rem; }
+        .btn {
+            padding: 0.6rem 1.2rem; border: none; border-radius: 8px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease; display: inline-flex;
+            align-items: center; gap: 0.5rem; text-decoration: none;
+        }
+        .btn-secondary { background: white; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-ai { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-ai:hover { background: linear-gradient(135deg, #5a6fde 0%, #684094 100%); }
+
+        .tabs {
+            display: flex; background: var(--primary); padding: 0.5rem; border-radius: 10px;
+            justify-content: center; margin-bottom: 2rem;
+        }
+        .tab-button {
+            padding: 0.75rem 1.5rem; cursor: pointer; background: none; border: none;
+            font-size: 1.1rem; font-weight: 600; color: white; opacity: 0.7;
+            border-radius: 8px; transition: all 0.3s ease;
+        }
+        .tab-button:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+        .tab-button.active { background: white; color: var(--primary); opacity: 1; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .manual-container {
+            background: white; padding: 3rem; border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.07); min-height: 600px;
+            font-family: 'Georgia', 'Times New Roman', serif; /* Estilo de manual */
+        }
+        .manual-cover { 
+            text-align: center; border: 2px solid var(--border); padding: 4rem 2rem; 
+            border-radius: 8px; margin-bottom: 3rem;
+        }
+        .manual-cover h2 { font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem; }
+        .manual-cover h3 { font-size: 1.5rem; color: var(--muted); margin-bottom: 2rem; }
+        .manual-cover .meta { color: var(--muted); }
+
+        .generation-panel {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 2rem; border-radius: 16px; margin-bottom: 2rem;
+        }
+        .generation-panel h3 { margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .generation-controls { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+        .generation-controls label { color: white; font-weight: 600; }
+        .generation-controls select, .generation-controls input {
+            padding: 0.5rem; border: none; border-radius: 8px; background: rgba(255,255,255,0.9);
+        }
+
+        .manual-section { 
+            margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border);
+            page-break-before: always;
+        }
+        .manual-section h4 { 
+            font-size: 1.8rem; color: var(--primary); border-bottom: 3px solid var(--accent);
+            padding-bottom: 0.5rem; margin-bottom: 1.5rem;
+        }
+        .section-content {
+            background: var(--light); padding: 1.5rem; border-radius: 8px; 
+            border: 1px solid var(--border); position: relative;
+        }
+        .section-content.editing { border-color: var(--accent); background: #FFF7ED; }
+        .edit-controls {
+            position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem;
+        }
+        .edit-btn, .save-btn, .cancel-btn {
+            width: 35px; height: 35px; border: none; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .edit-btn { background: var(--warning); color: white; }
+        .save-btn { background: var(--success); color: white; display: none; }
+        .cancel-btn { background: var(--muted); color: white; display: none; }
+
+        /* Contenido editable (DIV) y Textarea (oculto) */
+        .content-display { min-height: 100px; padding-right: 40px; }
+        .content-display p { margin-bottom: 1rem; }
+        .content-display ul { list-style-position: inside; padding-left: 1rem; }
+        .content-display li { margin-bottom: 0.5rem; }
+        .content-display h5 { font-size: 1.1rem; color: var(--primary); margin-top: 1rem; margin-bottom: 0.5rem; }
+
+        .content-editable {
+            background: white; border: 1px solid var(--accent); width: 100%; min-height: 200px;
+            resize: vertical; font-family: inherit; line-height: 1.6; padding: 1rem;
+            display: none;
+        }
+        
+        .instructor-note {
+            background: #FFFBEB; border-left: 4px solid #FBBF24; padding: 1.5rem;
+            margin: 1.5rem 0; border-radius: 8px;
+        }
+        .instructor-note p, .instructor-note ul { margin: 0; }
+        .instructor-note strong { color: #B45309; }
+
+        .generation-status { 
+            text-align: center; padding: 3rem; color: var(--muted);
+        }
+        .generation-status.loading { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border-radius: 16px;
+        }
+        .generation-status .spinner {
+            width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white; border-radius: 50%;
+            animation: spin 1s linear infinite; margin: 0 auto 1rem;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .ai-suggestions {
+            background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px;
+            padding: 1rem; margin: 1rem 0;
+        }
+        .ai-suggestions h4 { color: #92400E; margin-bottom: 0.5rem; }
+        .ai-suggestions p { color: #92400E; font-size: 0.9rem; margin: 0; }
+
+        /* Estilos para impresión */
+        @media print {
+            body { background: white; font-family: 'Georgia', 'Times New Roman', serif; }
+            .header, .tabs, .document-footer, .no-print, .edit-controls, .generation-panel, .ai-suggestions, .validation-panel { display: none !important; }
+            .container { margin: 0; padding: 0; }
+            .document-container {
+                box-shadow: none; border: none; padding: 0;
+            }
+            .manual-section {
+                margin-top: 2rem; padding-top: 1.5rem;
+            }
+            .manual-cover { page-break-after: always; }
+            .section-content { background: white; border: none; padding: 0; }
+            .instructor-note { background: #f3f3f3; }
+            @page {
+                size: letter;
+                margin: 2cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header no-print">
+        <div class="header-content">
+            <h1><i class="fa-solid fa-book-open" style="color: var(--accent);"></i> Módulo de Manuales</h1>
+            <div>
+                <a href="acceso.html" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+                <button class="btn btn-primary" onclick="printManual()">
+                    <i class="fa-solid fa-print"></i> Imprimir Manual Actual
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="tabs no-print">
+            <button class="tab-button active" onclick="showTab(event, 'participante')">
+                <i class="fa-solid fa-user"></i> Manual del Participante
+            </button>
+            <button class="tab-button" onclick="showTab(event, 'instructor')">
+                <i class="fa-solid fa-user-graduate"></i> Manual del Instructor
+            </button>
+        </div>
+
+        <div id="participante" class="tab-content active">
+            <div class="generation-panel no-print">
+                <h3><i class="fa-solid fa-robot"></i> Generador de Manual del Participante</h3>
+                <div class="generation-controls">
+                    <button class="btn btn-ai" onclick="generateManual('participante')">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generar Manual con IA
+                    </button>
+                    <button class="btn btn-warning" onclick="saveData('participante')" id="part-save-btn" style="display: none;">
+                        <i class="fa-solid fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+
+            <div id="participante-content" class="manual-container printable">
+                <div class="generation-status">
+                    <i class="fa-solid fa-book" style="font-size: 3rem; color: var(--muted);"></i>
+                    <h3>Genera el Manual del Participante con IA</h3>
+                    <p>Se basará en los objetivos y temario de tu Carta Descriptiva.</p>
+                </div>
+            </div>
+            
+            <div class="ai-suggestions no-print" style="display: none;" id="part-suggestions">
+                <h4><i class="fa-solid fa-lightbulb"></i> ¡Manual Generado!</h4>
+                <p>El manual ha sido creado. Puedes hacer clic en el botón <i class="fa-solid fa-edit"></i> en cualquier sección para editar el contenido.</p>
+            </div>
+        </div>
+
+        <div id="instructor" class="tab-content">
+            <div class="generation-panel no-print">
+                <h3><i class="fa-solid fa-robot"></i> Generador de Manual del Instructor</h3>
+                <div class="generation-controls">
+                    <button class="btn btn-ai" onclick="generateManual('instructor')">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generar Manual con IA
+                    </button>
+                    <button class="btn btn-warning" onclick="saveData('instructor')" id="inst-save-btn" style="display: none;">
+                        <i class="fa-solid fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+
+            <div id="instructor-content" class="manual-container printable">
+                <div class="generation-status">
+                    <i class="fa-solid fa-chalkboard-teacher" style="font-size: 3rem; color: var(--muted);"></i>
+                    <h3>Genera el Manual del Instructor con IA</h3>
+                    <p>Incluirá notas pedagógicas y estrategias de facilitación.</p>
+                </div>
+            </div>
+            
+            <div class="ai-suggestions no-print" style="display: none;" id="inst-suggestions">
+                <h4><i class="fa-solid fa-lightbulb"></i> ¡Manual Generado!</h4>
+                <p>El manual incluye notas didácticas. Puedes editar cualquier sección antes de imprimir.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    let EC0301Manager;
+    let cartaData = {};
+    let manualsData = {
+        participante: null,
+        instructor: null
+    };
+    let currentEditing = { type: null, id: null };
+
+    // ========== INICIALIZACIÓN Y CARGA DE DATOS ==========
+    document.addEventListener('DOMContentLoaded', () => {
+        // ===== CORRECCIÓN: Guardia de Seguridad Robusta =====
+        setTimeout(() => {
+            if (typeof auth === 'undefined' || typeof EC0301Manager === 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error Crítico',
+                    text: 'No se pudieron cargar los módulos de sistema (auth.js, ec0301-data-manager.js). Revisa las rutas en el HTML.',
+                    confirmButtonColor: '#EF4444'
+                }).then(() => window.location.href = 'index.html');
+                return;
+            }
+            
+            if (!auth.isLoggedIn()) {
+                 window.location.replace('index.html');
+                 return;
+            }
+            
+            // Si todo está bien, cargar el manager y la página
+            EC0301Manager = window.EC0301Manager;
+            loadData();
+        }, 50); // 50ms de espera
+    });
+
+    /**
+     * Carga los datos de la Carta Descriptiva y los manuales guardados.
+     */
+    function loadData() {
+        try {
+            cartaData = EC0301Manager.getData();
+            if (!cartaData || !cartaData.nombre) {
+                showMissingDataAlert();
+                return;
+            }
+            
+            const savedManuals = EC0301Manager.loadProduct('manuales');
+            if (savedManuals) {
+                manualsData = savedManuals;
+                if (manualsData.participante) {
+                    renderManual('participante', manualsData.participante);
+                }
+                if (manualsData.instructor) {
+                    renderManual('instructor', manualsData.instructor);
+                }
+            }
+
+        } catch (error) {
+            console.error('Error al cargar datos:', error);
+            showMissingDataAlert();
+        }
+    }
+
+    // ========== GENERACIÓN DE MANUALES (IA SIMULADA) ==========
+
+    /**
+     * Punto de entrada para generar un manual
+     * @param {string} type - 'participante' o 'instructor'
+     */
+    async function generateManual(type) {
+        // Usamos cartaData.temas (de la nueva carta EC0217)
+        if (!cartaData || !cartaData.temas || cartaData.temas.length === 0) {
+            Swal.fire('Datos Insuficientes', 'Debes completar y guardar la sección de "Temas" en tu Carta Descriptiva antes de generar un manual.', 'warning');
+            return;
+        }
+
+        const container = $(`${type}-content`);
+        container.innerHTML = `
+            <div class="generation-status loading">
+                <div class="spinner"></div>
+                <h3>Generando Manual del ${type === 'participante' ? 'Participante' : 'Instructor'}...</h3>
+                <p>Analizando temario y objetivos...</p>
+            </div>
+        `;
+
+        // Simular llamada a IA
+        await new Promise(resolve => setTimeout(resolve, 2500)); 
+
+        const manualContent = createAIContent(type, cartaData);
+        manualsData[type] = manualContent; // Guardar en el objeto JS
+        renderManual(type, manualContent);
+        saveData(type, true); // Auto-guardar
+    }
+
+    /**
+     * Lógica de la "IA" para crear el contenido del manual
+     * (Adaptado a la nueva estructura de cartaData)
+     */
+    function createAIContent(type, data) {
+        const esInstructor = type === 'instructor';
+        
+        let cover = {
+            title: `MANUAL DEL ${type.toUpperCase()}`,
+            subtitle: data.nombre || 'Curso de Capacitación',
+            author: `Facilitador: ${data.facilitador || 'No definido'}`
+        };
+
+        let sections = [];
+
+        // 1. Bienvenida
+        sections.push({
+            id: 'bienvenida',
+            title: 'Bienvenida e Introducción',
+            content: `¡Te damos la más cordial bienvenida al curso **"${data.nombre}"**!
+            
+Este manual ha sido diseñado para ser tu guía principal de aprendizaje. ${esInstructor ? 'Como instructor, encontrarás notas clave para guiar a los participantes.' : 'Aquí encontrarás los conceptos clave, actividades y ejercicios para desarrollar tus competencias.'}
+
+**Propósito del Curso:**
+${data.proposito || 'Desarrollar competencias clave para el ámbito profesional.'}
+
+**Objetivo General:**
+Al finalizar el curso, el participante ${data.og?.accion || '...'} ${data.og?.cond || '...'}, ${data.og?.criterio || '...'}.`
+        });
+        
+        // 2. Temario (Contenido Principal)
+        data.temas.forEach((tema, index) => {
+            let temaContent = `
+**Objetivo(s) Particular(es) Relacionado(s):**
+${findObjetivosParaTema(tema.nombre, data.objetivos)}
+
+**Contenido Didáctico:**
+Este tema se enfoca en... (Contenido simulado por IA sobre ${tema.nombre}).
+- Punto Clave 1 sobre ${tema.nombre}.
+- Punto Clave 2 sobre ${tema.nombre}.
+- Punto Clave 3 sobre ${tema.nombre}.
+
+**Actividades de Aprendizaje:**
+${tema.desc || `(Actividad simulada por IA para ${tema.nombre})`}
+1.  Revisar la presentación del Módulo ${index + 1}.
+2.  Participar en la dinámica: "${tema.tec || 'Expositiva'}".
+3.  Completar el ejercicio de autoevaluación.
+`;
+            
+            if (esInstructor) {
+                temaContent += `
+<div class="instructor-note">
+<strong><i class="fas fa-lightbulb"></i> Nota del Instructor:</strong>
+<ul>
+    <li>**Estrategia Didáctica:** Para este tema (${tema.nombre}), se recomienda usar una técnica ${tema.tec || 'expositiva y práctica'}.</li>
+    <li>**Punto Crítico:** Asegúrate de que los participantes comprendan la aplicación práctica de este tema.</li>
+    <li>**Tiempo Estimado:** ${tema.duracion || 'N/A'} minutos.</li>
+    <li>**Materiales:** ${tema.mat || 'Presentación, Manual'}.</li>
+</ul>
+</div>
+`;
+            }
+            
+            sections.push({
+                id: `tema-${index}`,
+                title: `Tema ${index + 1}: ${tema.nombre}`,
+                content: temaContent
+            });
+        });
+        
+        // 3. Cierre y Evaluación
+        sections.push({
+            id: 'cierre',
+            title: 'Cierre y Evaluación del Curso',
+            content: `**Resumen del Curso:**
+Hemos cubierto ${data.temas.length} temas principales, desde ${data.temas[0]?.nombre || 'el inicio'} hasta ${data.temas[data.temas.length - 1]?.nombre || 'el final'}.
+
+**Sistema de Evaluación:**
+Para acreditar el curso, se requiere:
+- **Evaluación Formativa:** ${data.ev?.form_pct || 'N/A'}%
+- **Evaluación Sumativa:** ${data.ev?.sum_pct || 'N/A'}%
+- **Evaluación de Satisfacción:** ${data.ev?.sat_pct || 'N/A'}%
+- **Calificación Mínima:** ${data.ev?.min || 'N/A'}%
+`
+        });
+
+        return { cover, sections };
+    }
+    
+    /**
+     * Ayudante para buscar objetivos relacionados con un tema
+     * (Se asume que los objetivos están en orden: 1=Cog, 2=Psi, 3=Afe, 4=Rel)
+     */
+    function findObjetivosParaTema(temaNombre, objetivos) {
+        if (!objetivos || objetivos.length === 0) return "No hay objetivos particulares definidos.";
+        
+        // Simulación simple: asigna objetivos a temas
+        const index = cartaData.temas.findIndex(t => t.nombre === temaNombre);
+        if (objetivos[index]) {
+             return `- **(${objetivos[index].dom})**: ${objetivos[index].accion}, ${objetivos[index].cond}.`;
+        }
+        
+        return "- (Este tema apoya al Objetivo General)";
+    }
+
+    /**
+     * Dibuja el manual en el DOM
+     */
+    function renderManual(type, manualContent) {
+        const container = $(`${type}-content`);
+        if (!manualContent || !manualContent.cover) {
+            container.innerHTML = `<div class="generation-status"><p>No se pudo cargar el manual.</p></div>`;
+            return;
+        }
+
+        let html = `
+            <div class="manual-cover">
+                <h2>${manualContent.cover.title}</h2>
+                <h3>${manualContent.cover.subtitle}</h3>
+                <div class="meta">
+                    <p><strong>${manualContent.cover.author}</strong></p>
+                </div>
+            </div>
+        `;
+
+        manualContent.sections.forEach(section => {
+            html += `
+                <div class="manual-section" id="sec-${type}-${section.id}">
+                    <h4>${section.title}</h4>
+                    <div class="section-content" data-section-id="${section.id}">
+                        <div class="edit-controls no-print">
+                            <button class="edit-btn" onclick="editSection('${section.id}', '${type}')" title="Editar sección">
+                                <i class="fa-solid fa-edit"></i>
+                            </button>
+                            <button class="save-btn" onclick="saveSection('${section.id}', '${type}')" title="Guardar cambios">
+                                <i class="fa-solid fa-save"></i>
+                            </button>
+                            <button class="cancel-btn" onclick="cancelEdit('${section.id}', '${type}')" title="Cancelar edición">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="content-display">${formatContent(section.content)}</div>
+                        <textarea class="content-editable">${section.content}</textarea>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+        $(`${type === 'participante' ? 'part' : 'inst'}-save-btn`).style.display = 'inline-flex';
+        $(`${type === 'participante' ? 'part' : 'inst'}-suggestions`).style.display = 'block';
+    }
+
+    // ========== EDICIÓN DE CONTENIDO ==========
+
+    function editSection(sectionId, type) {
+        // Si ya estamos editando otra cosa, la cancelamos
+        if (currentEditing.id) {
+            cancelEdit(currentEditing.id, currentEditing.type);
+        }
+
+        currentEditing = { id: sectionId, type: type };
+        const sectionEl = document.querySelector(`#sec-${type}-${sectionId} .section-content`);
+        
+        sectionEl.classList.add('editing');
+        sectionEl.querySelector('.content-display').style.display = 'none';
+        sectionEl.querySelector('.content-editable').style.display = 'block';
+        sectionEl.querySelector('.edit-btn').style.display = 'none';
+        sectionEl.querySelector('.save-btn').style.display = 'flex';
+        sectionEl.querySelector('.cancel-btn').style.display = 'flex';
+        
+        sectionEl.querySelector('.content-editable').focus();
+    }
+
+    function saveSection(sectionId, type) {
+        const sectionEl = document.querySelector(`#sec-${type}-${sectionId} .section-content`);
+        const newContent = sectionEl.querySelector('.content-editable').value;
+        
+        // Actualizar datos en el objeto JS
+        const sectionIndex = manualsData[type].sections.findIndex(s => s.id === sectionId);
+        if (sectionIndex !== -1) {
+            manualsData[type].sections[sectionIndex].content = newContent;
+        }
+        
+        // Actualizar vista
+        sectionEl.querySelector('.content-display').innerHTML = formatContent(newContent);
+        
+        // Salir del modo edición
+        cancelEdit(sectionId, type);
+        toast('Sección actualizada', 'success');
+    }
+
+    function cancelEdit(sectionId, type) {
+        const sectionEl = document.querySelector(`#sec-${type}-${sectionId} .section-content`);
+        
+        // Revertir al contenido original (el que está en el objeto)
+        const originalContent = manualsData[type].sections.find(s => s.id === sectionId).content;
+        sectionEl.querySelector('.content-editable').value = originalContent;
+        sectionEl.querySelector('.content-display').innerHTML = formatContent(originalContent);
+        
+        // Ocultar controles
+        sectionEl.classList.remove('editing');
+        sectionEl.querySelector('.content-display').style.display = 'block';
+        sectionEl.querySelector('.content-editable').style.display = 'none';
+        sectionEl.querySelector('.edit-btn').style.display = 'flex';
+        sectionEl.querySelector('.save-btn').style.display = 'none';
+        sectionEl.querySelector('.cancel-btn').style.display = 'none';
+        
+        currentEditing = { id: null, type: null };
+    }
+
+    /**
+     * Guarda el objeto 'manualsData' completo en el LocalStorage
+     */
+    function saveData(type, isAutoSave = false) {
+        if (currentEditing.id) {
+            // Si el usuario está editando, forzar guardado
+            saveSection(currentEditing.id, currentEditing.type);
+        }
+        try {
+            EC0301Manager.saveProduct('manuales', manualsData);
+            if (!isAutoSave) {
+                toast('Borrador de manuales guardado', 'success');
+            }
+        } catch (e) {
+            toast(`Error al guardar: ${e.message}`, 'error');
+        }
+    }
+
+    // ========== UTILIDADES ==========
+    const $ = id => document.getElementById(id);
+
+    function toast(mensaje, tipo = 'success') {
+        Swal.fire({
+            toast: true, position: 'top-end', icon: tipo,
+            title: mensaje, showConfirmButton: false, timer: 3000, timerProgressBar: true
+        });
+    }
+
+    function showMissingDataAlert() {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Datos Incompletos',
+            html: 'No se encontraron datos de la carta descriptiva.<br>Por favor, completa y <strong>guarda</strong> primero la <strong>Carta Descriptiva</strong>.',
+            confirmButtonText: 'Ir a Carta Descriptiva',
+            confirmButtonColor: '#1E3A8A'
+        }).then(() => {
+            window.location.href = 'carta_descriptiva.html';
+        });
+    }
+
+    function showTab(event, tabName) {
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('active');
+        });
+        document.getElementById(tabName).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function printManual() {
+        window.print();
+    }
+    
+    function generatePDF(type) {
+        Swal.fire('Función en desarrollo', 'La exportación a PDF para este módulo estará disponible próximamente.', 'info');
+    }
+    
+    function formatContent(content) {
+        // Convierte saltos de línea a <br> y **bold** a <strong>
+        return content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+    }
+    </script>
+</body>
+</html>
