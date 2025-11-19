@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoja de Respuestas - EC0301</title>
+
+    <script src="sistema_central/auth.js" defer></script>
+    <script src="sistema_central/ec0301-data-manager.js" defer></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof auth !== 'undefined' && !auth.isLoggedIn()) {
+                window.location.replace('index.html');
+            }
+        });
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        /* (Estilos reutilizados de módulos anteriores) */
+        :root {
+            --primary: #1E3A8A; --accent: #FF6B35; --success: #22C55E; --warning: #F59E0B;
+            --danger: #EF4444; --light: #F8FAFC; --border: #E5E7EB; --text: #1F2937; --muted: #6B7280;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #F1F5F9; color: var(--text); line-height: 1.7;
+        }
+        .header {
+            background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky; top: 0; z-index: 1000; border-bottom: 3px solid var(--accent);
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
+        .header-content {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem; max-width: 1200px; margin: 0 auto;
+        }
+        h1 { font-size: 1.75rem; color: var(--primary); display: flex; align-items: center; gap: 0.75rem; }
+        .btn {
+            padding: 0.6rem 1.2rem; border: none; border-radius: 8px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease; display: inline-flex;
+            align-items: center; gap: 0.5rem; text-decoration: none;
+        }
+        .btn-secondary { background: white; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-primary { background: var(--primary); color: white; }
+
+        .document-container {
+            background: white; padding: 3rem; border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.07); min-height: 600px;
+        }
+        .document-header { 
+            text-align: center; border: 2px solid var(--border); padding: 2rem; 
+            border-radius: 8px; margin-bottom: 3rem; 
+        }
+        .document-header h2 { font-size: 2rem; color: var(--primary); text-transform: uppercase; }
+        .document-header h3 { font-size: 1.2rem; color: var(--muted); margin-top: 0.5rem; }
+        .document-info { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: left; margin-top: 2rem; }
+        .document-info strong { color: var(--primary); }
+        
+        .manual-section { 
+            margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border);
+            page-break-before: always;
+        }
+        .manual-section h4 { 
+            font-size: 1.8rem; color: var(--primary); border-bottom: 3px solid var(--accent);
+            padding-bottom: 0.5rem; margin-bottom: 1.5rem;
+        }
+        .section-content {
+            background: var(--light); padding: 1.5rem; border-radius: 8px; 
+            border: 1px solid var(--border); position: relative;
+        }
+        .section-content.editing { border-color: var(--accent); background: #FFF7ED; }
+
+        .edit-controls {
+            position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem;
+        }
+        .edit-btn, .save-btn, .cancel-btn {
+            width: 35px; height: 35px; border: none; border-radius: 50%;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .edit-btn { background: var(--warning); color: white; }
+        .save-btn { background: var(--success); color: white; display: none; }
+        .cancel-btn { background: var(--muted); color: white; display: none; }
+        
+        .content-display { min-height: 100px; padding-right: 40px; }
+        .content-display p { margin-bottom: 1rem; }
+        .content-display ul { list-style-position: inside; padding-left: 1rem; }
+        .content-display li { margin-bottom: 0.5rem; }
+        .content-display h5 { font-size: 1.1rem; color: var(--primary); margin-top: 1rem; margin-bottom: 0.5rem; }
+
+        .content-editable {
+            background: white; border: 1px solid var(--accent); width: 100%; min-height: 200px;
+            resize: vertical; font-family: inherit; line-height: 1.6; padding: 1rem;
+            display: none;
+        }
+        
+        /* Estilos para las preguntas y respuestas */
+        .pregunta-item { margin-bottom: 2rem; }
+        .pregunta-item strong {
+            font-size: 1.1rem;
+            display: block;
+            margin-bottom: 0.75rem;
+        }
+        .pregunta-item ul {
+            list-style-type: none;
+            padding-left: 0.5rem;
+        }
+        .pregunta-item li {
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 0.25rem;
+            color: var(--muted);
+        }
+        .respuesta-correcta {
+            background-color: #F0FDF4; /* Verde muy claro */
+            color: #15803D; /* Verde oscuro */
+            font-weight: 700;
+            border: 1px solid var(--success);
+        }
+
+        /* Estilos para impresión */
+        @media print {
+            body { background: white; font-family: 'Georgia', 'Times New Roman', serif; }
+            .header, .no-print { display: none !important; }
+            .container { margin: 0; padding: 0; }
+            .document-container {
+                box-shadow: none; border: none; padding: 0;
+            }
+            .manual-section {
+                margin-top: 2rem; padding-top: 1.5rem;
+                page-break-inside: avoid;
+            }
+            .section-content { background: white; border: none; padding: 0; }
+            .edit-controls { display: none !important; }
+            .respuesta-correcta {
+                background-color: #F0FDF4 !important;
+                color: #15803D !important;
+                border: 1px solid #22C55E !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            @page {
+                size: letter;
+                margin: 2cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header no-print">
+        <div class="header-content">
+            <h1><i class="fa-solid fa-key" style="color: var(--accent);"></i> Hoja de Respuestas</h1>
+            <div>
+                <a href="acceso.html" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Dashboard</a>
+                <button class="btn btn-primary" onclick="printDocument()">
+                    <i class="fa-solid fa-print"></i> Imprimir Respuestas
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="answer-key-content" class="document-container printable">
+            
+            <div class="document-header">
+                <h2>HOJA DE RESPUESTAS</h2>
+                <h3 id="info_nombre">Cargando...</h3>
+                <div class="document-info">
+                    <div><strong>Facilitador:</strong> <span id="info_facilitador">-</span></div>
+                    <div><strong>Diseñador:</strong> <span id="info_diseñador">-</span></div>
+                </div>
+            </div>
+
+            <div class="manual-section" id="sec-diag">
+                <h4>1. Evaluación Diagnóstica</h4>
+                <div class="section-content" data-section-id="diag">
+                    <div class="edit-controls no-print">
+                        <button class="edit-btn" onclick="editSection('diag')"><i class="fa-solid fa-edit"></i></button>
+                        <button class="save-btn" onclick="saveSection('diag')"><i class="fa-solid fa-save"></i></button>
+                        <button class="cancel-btn" onclick="cancelEdit('diag')"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    <div class="content-display" id="diag-content">
+                        <p>Cargando descripción de la evaluación diagnóstica...</p>
+                    </div>
+                    <textarea class="content-editable"></textarea>
+                </div>
+            </div>
+            
+            <div class="manual-section" id="sec-form">
+                <h4>2. Evaluación Formativa</h4>
+                <div class="section-content" data-section-id="form">
+                    <div class="edit-controls no-print">
+                        <button class="edit-btn" onclick="editSection('form')"><i class="fa-solid fa-edit"></i></button>
+                        <button class="save-btn" onclick="saveSection('form')"><i class="fa-solid fa-save"></i></button>
+                        <button class="cancel-btn" onclick="cancelEdit('form')"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    <div class="content-display" id="form-content">
+                        <p>Cargando descripción de la evaluación formativa...</p>
+                    </div>
+                    <textarea class="content-editable"></textarea>
+                </div>
+            </div>
+
+            <div class="manual-section" id="sec-sum">
+                <h4>3. Evaluación Sumativa (Hoja de Respuestas)</h4>
+                <div class="section-content" data-section-id="sum">
+                    <div class="edit-controls no-print">
+                        <button class="edit-btn" onclick="editSection('sum')"><i class="fa-solid fa-edit"></i></button>
+                        <button class="save-btn" onclick="saveSection('sum')"><i class="fa-solid fa-save"></i></button>
+                        <button class="cancel-btn" onclick="cancelEdit('sum')"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    <div class="content-display" id="sum-content">
+                        <p>Cargando banco de reactivos...</p>
+                    </div>
+                    <textarea class="content-editable"></textarea>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+    let EC0301Manager;
+    let cartaData = {};
+    let savedContent = { diag: '', form: '', sum: '' }; // Almacén para el modo edición
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // (AJUSTE) Verificar que los scripts globales estén cargados
+        if (typeof auth === 'undefined' || typeof EC0301Manager === 'undefined') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error Crítico',
+                text: 'No se pudieron cargar los módulos de sistema (auth.js, ec0301-data-manager.js). Revisa las rutas en el HTML.',
+                confirmButtonColor: '#EF4444'
+            }).then(() => window.location.href = 'index.html');
+            return;
+        }
+        
+        // Si el login es correcto, cargar el manager y la página
+        EC0301Manager = window.EC0301Manager;
+        loadData();
+    });
+
+    /**
+     * Carga los datos de la Carta Descriptiva y las Evaluaciones.
+     */
+    function loadData() {
+        try {
+            cartaData = EC0301Manager.getData();
+            if (!cartaData || !cartaData.nombre) {
+                showMissingDataAlert();
+                return;
+            }
+
+            // 1. Poblar Encabezado
+            $('info_nombre').textContent = cartaData.nombre || 'Nombre del Curso';
+            $('info_facilitador').textContent = cartaData.facilitador || 'No definido';
+            $('info_diseñador').textContent = cartaData.diseñador || 'No definido';
+
+            // 2. Poblar Evaluación Diagnóstica (de Carta Descriptiva)
+            let diagContent = `<h5>Instrumento: ${cartaData.ev?.diag?.ins || 'No definido'}</h5>
+<p><strong>Propósito:</strong> ${cartaData.ev?.diag?.prop || 'No definido'}</p>
+<p><strong>Momento:</strong> ${cartaData.ev?.diag?.mom || 'No definido'}</p>
+<p>(Este es un instrumento de diagnóstico, por lo general no tiene una "hoja de respuestas" con calificación, sino que sirve para identificar el nivel del grupo).</p>`;
+            savedContent.diag = diagContent;
+            $('diag-content').innerHTML = diagContent;
+            $('sec-diag').querySelector('.content-editable').value = diagContent;
+
+
+            // 3. Poblar Evaluación Formativa (de Carta Descriptiva)
+            let formContent = `<h5>Instrumento(s): ${cartaData.ev?.form?.ins || 'No definido'}</h5>
+<p><strong>Ponderación:</strong> ${cartaData.ev?.form?.pct || 'N/A'}%</p>
+<p><strong>Momento:</strong> ${cartaData.ev?.form?.mom || 'No definido'}</p>
+<p>(Este instrumento evalúa el desempeño durante el curso, como rúbricas o listas de cotejo. Las "respuestas" se encuentran en los propios instrumentos generados en el módulo de Evaluaciones).</p>`;
+            savedContent.form = formContent;
+            $('form-content').innerHTML = formContent;
+            $('sec-form').querySelector('.content-editable').value = formContent;
+
+
+            // 4. Poblar Evaluación Sumativa (de Evaluaciones)
+            const preguntas = EC0301Manager.loadProduct('evaluacion-sumativa');
+            if (!preguntas || preguntas.length === 0) {
+                $('sum-content').innerHTML = '<p style="color: var(--danger);">No se encontraron reactivos. Por favor, genera la Evaluación Sumativa en el módulo "Evaluaciones" primero.</p>';
+                return;
+            }
+            
+            let sumContent = '';
+            preguntas.forEach((pregunta, index) => {
+                sumContent += `<div class="pregunta-item">
+                    <strong>${index + 1}. ${pregunta.pregunta}</strong>
+                    <ul>`;
+                
+                let inciso = 'a';
+                pregunta.opciones.forEach(opcion => {
+                    if (opcion.correcta) {
+                        sumContent += `<li class="respuesta-correcta">${inciso}) ${opcion.texto} <strong>(Respuesta Correcta)</strong></li>`;
+                    } else {
+                        sumContent += `<li>${inciso}) ${opcion.texto}</li>`;
+                    }
+                    inciso = String.fromCharCode(inciso.charCodeAt(0) + 1); // a -> b -> c
+                });
+                
+                sumContent += `</ul></div>`;
+            });
+            
+            savedContent.sum = sumContent;
+            $('sum-content').innerHTML = sumContent;
+            $('sec-sum').querySelector('.content-editable').value = sumContent;
+
+
+        } catch (error) {
+            console.error('Error al cargar datos:', error);
+            showMissingDataAlert();
+        }
+    }
+
+    // ========== EDICIÓN DE CONTENIDO ==========
+    // (Funciones para editar el contenido generado por IA si el usuario lo desea)
+
+    let currentEditing = { id: null, originalContent: '' };
+
+    function editSection(sectionId) {
+        if (currentEditing.id) {
+            cancelEdit(currentEditing.id); // Cancela la edición anterior
+        }
+
+        const sectionEl = document.querySelector(`[data-section-id="${sectionId}"]`);
+        currentEditing.id = sectionId;
+        currentEditing.originalContent = savedContent[sectionId]; // Usar el contenido original guardado
+        
+        sectionEl.classList.add('editing');
+        sectionEl.querySelector('.content-display').style.display = 'none';
+        sectionEl.querySelector('.content-editable').style.display = 'block';
+        sectionEl.querySelector('.edit-btn').style.display = 'none';
+        sectionEl.querySelector('.save-btn').style.display = 'flex';
+        sectionEl.querySelector('.cancel-btn').style.display = 'flex';
+        
+        sectionEl.querySelector('.content-editable').focus();
+    }
+
+    function saveSection(sectionId) {
+        const sectionEl = document.querySelector(`[data-section-id="${sectionId}"]`);
+        const newContent = sectionEl.querySelector('.content-editable').value;
+        
+        // Actualizar datos en el objeto JS de guardado
+        savedContent[sectionId] = newContent;
+        
+        // Actualizar vista
+        sectionEl.querySelector('.content-display').innerHTML = newContent; // El usuario ya edita el HTML
+        
+        // Salir del modo edición
+        cancelEdit(sectionId);
+        toast('Sección actualizada', 'success');
+    }
+
+    function cancelEdit(sectionId) {
+        const sectionEl = document.querySelector(`[data-section-id="${sectionId}"]`);
+        
+        // Revertir al contenido original guardado
+        sectionEl.querySelector('.content-editable').value = currentEditing.originalContent;
+        sectionEl.querySelector('.content-display').innerHTML = currentEditing.originalContent;
+        
+        // Ocultar controles
+        sectionEl.classList.remove('editing');
+        sectionEl.querySelector('.content-display').style.display = 'block';
+        sectionEl.querySelector('.content-editable').style.display = 'none';
+        sectionEl.querySelector('.edit-btn').style.display = 'flex';
+        sectionEl.querySelector('.save-btn').style.display = 'none';
+        sectionEl.querySelector('.cancel-btn').style.display = 'none';
+        
+        currentEditing = { id: null, originalContent: '' };
+    }
+
+    // ========== UTILIDADES ==========
+    const $ = id => document.getElementById(id);
+
+    function toast(mensaje, tipo = 'success') {
+        Swal.fire({
+            toast: true, position: 'top-end', icon: tipo,
+            title: mensaje, showConfirmButton: false, timer: 3000, timerProgressBar: true
+        });
+    }
+
+    function showMissingDataAlert() {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Datos Incompletos',
+            html: 'No se encontraron datos. Por favor, completa y <strong>guarda</strong> primero la <strong>Carta Descriptiva</strong> y el módulo de <strong>Evaluaciones</strong>.',
+            confirmButtonText: 'Ir a Carta Descriptiva',
+            confirmButtonColor: '#1E3A8A'
+        }).then(() => {
+            window.location.href = 'carta_descriptiva.html';
+        });
+    }
+
+    function showTab(event, tabName) {
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('active');
+        });
+        document.getElementById(tabName).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function printDocument() {
+        window.print();
+    }
+    </script>
+</body>
+</html>
