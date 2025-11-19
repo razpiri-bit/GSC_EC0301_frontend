@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillsCert EC0301 – Backend API</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      max-width: 720px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+    }
+    h1 {
+      font-size: 1.9rem;
+      margin-bottom: 0.25rem;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    h1 span {
+      font-size: 1.4rem;
+    }
+    h2 {
+      font-size: 1.2rem;
+      margin: 1.5rem 0 .75rem;
+      color: #1f2937;
+    }
+    p {
+      margin: .5rem 0;
+      color: #4b5563;
+      line-height: 1.5;
+    }
+    code {
+      background: #f9fafb;
+      padding: .15rem .4rem;
+      border-radius: .35rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: .85rem;
+    }
+    ul {
+      margin-left: 1.25rem;
+      margin-top: .35rem;
+      color: #374151;
+    }
+    li {
+      margin: .2rem 0;
+    }
+    .endpoint {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: .85rem;
+      background: #f3f4ff;
+      padding: .35rem .55rem;
+      border-radius: .35rem;
+      display: inline-block;
+      margin: .15rem 0;
+    }
+    .pill {
+      display: inline-block;
+      padding: .15rem .55rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      background: #e5f3ff;
+      color: #1d4ed8;
+      margin-left: .5rem;
+    }
+    .small {
+      font-size: .8rem;
+      color: #6b7280;
+      margin-top: 1.5rem;
+    }
+    a {
+      color: #4f46e5;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>
+    <span>🎓</span> SkillsCert EC0301 – Backend API
+  </h1>
+  <p>
+    Este servicio es el <strong>backend</strong> de SkillsCert EC0301. No es la interfaz para usuarios finales,
+    sino la API que consume el frontend público.
+  </p>
+
+  <h2>Estado rápido</h2>
+  <p>
+    Puedes comprobar que el backend está en línea visitando:
+  </p>
+  <p class="endpoint">GET /health</p>
+  <p class="small">
+    Ejemplo: <code>https://ec0301-globalskillscert-backend.onrender.com/health</code>
+  </p>
+
+  <h2>Endpoints principales</h2>
+  <ul>
+    <li><span class="endpoint">POST /create-checkout-session</span> – Crea sesión de pago Stripe.</li>
+    <li><span class="endpoint">POST /verify-payment</span> – Verifica un pago completado y genera código de acceso.</li>
+    <li><span class="endpoint">POST /login</span> – Login con email + código de acceso.</li>
+    <li><span class="endpoint">GET /test-db</span> – Prueba de conexión a la base de datos.</li>
+    <li><span class="endpoint">POST /webhook/stripe</span> – Webhook de Stripe (usa <code>express.raw()</code>).</li>
+  </ul>
+
+  <h2>Frontend de producción</h2>
+  <p>
+    La interfaz que usan tus clientes está en:
+    <br>
+    <a href="https://ec0301-globalskillscert.onrender.com" target="_blank">
+      https://ec0301-globalskillscert.onrender.com
+    </a>
+    <span class="pill">Frontend público</span>
+  </p>
+
+  <p class="small">
+    Si ves esta página es porque has abierto directamente la URL del backend. Para usar el sistema,
+    accede siempre al dominio del frontend.
+  </p>
+</div>
+</body>
+</html>
