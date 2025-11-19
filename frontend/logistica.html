@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Módulo de Logística - EC0301</title>
+
+    <script src="sistema_central/auth.js" defer></script>
+    <script src="sistema_central/ec0301-data-manager.js" defer></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Espera un ciclo para asegurar que los scripts 'defer' se carguen
+            setTimeout(() => {
+                if (typeof auth === 'undefined' || typeof EC0301Manager === 'undefined') {
+                    console.error("Error crítico: Módulos de sistema no cargados.");
+                    Swal.fire({
+                        icon: 'error', title: 'Error Crítico',
+                        text: 'No se pudieron cargar los módulos del sistema (auth.js o ec0301-data-manager.js).',
+                        confirmButtonColor: '#ef4444'
+                    }).then(() => window.location.href = 'index.html');
+                    return;
+                }
+                if (!auth.isLoggedIn()) {
+                    window.location.replace('index.html');
+                }
+                
+                // Si todo está bien, inicializa la lógica de la página
+                loadLogisticaData();
+
+            }, 50); // 50ms de espera
+        });
+    </script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        /* (Estilos de tu propuesta) */
+        :root {
+            --primary: #1E3A8A; --accent: #FF6B35; --success: #22C55E; --warning: #F59E0B;
+            --danger: #EF4444; --light: #F8FAFC; --border: #E5E7EB; --text: #1F2937; --muted: #6B7280;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #F1F5F9; color: var(--text);
+        }
+        .header {
+            background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky; top: 0; z-index: 1000; border-bottom: 3px solid var(--accent);
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1rem; }
+        .header-content {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem; max-width: 1200px; margin: 0 auto;
+        }
+        h1 { font-size: 1.75rem; color: var(--primary); display: flex; align-items: center; gap: 0.75rem; }
+        .btn {
+            padding: 0.6rem 1.2rem; border: none; border-radius: 8px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s ease; display: inline-flex;
+            align-items: center; gap: 0.5rem; text-decoration: none;
+        }
+        .btn-secondary { background: white; color: var(--primary); border: 2px solid var(--primary); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary:hover { background: #f0f5ff; }
+        .btn-primary:hover { background: #1c3274; }
+
+        .tabs {
+            display: flex; background: var(--primary); padding: 0.5rem; border-radius: 10px;
+            justify-content: center; margin-bottom: 2rem;
+        }
+        .tab-button {
+            padding: 0.75rem 1.5rem; cursor: pointer; background: none; border: none;
+            font-size: 1.1rem; font-weight: 600; color: white; opacity: 0.7;
+            border-radius: 8px; transition: all 0.3s ease;
+        }
+        .tab-button:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+        .tab-button.active { background: white; color: var(--primary); opacity: 1; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .document-container {
+            background: white; padding: 3rem; border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.07); min-height: 600px;
+        }
+        .document-header { text-align: center; border: 2px solid var(--border); padding: 2rem; border-radius: 8px; }
+        .document-header h2 { font-size: 2rem; color: var(--primary); text-transform: uppercase; }
+        .document-header h3 { font-size: 1.2rem; color: var(--muted); margin-top: 0.5rem; }
+        .document-info { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: left; margin-top: 2rem; }
+        .document-info strong { color: var(--primary); }
+        .document-footer { text-align: center; margin-top: 2rem; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 2rem; }
+        th, td { border: 1px solid var(--border); padding: 1rem; text-align: left; }
+        th { background: var(--light); font-weight: 600; }
+        tbody tr:nth-child(even) { background: var(--light); }
+        .empty-row td { height: 40px; border-bottom: 1px solid #ccc; }
+
+        .contract-section { margin: 2rem 0; padding: 1.5rem; border-left: 4px solid var(--accent); background: var(--light); border-radius: 8px; }
+        .contract-section h4 { color: var(--primary); margin-bottom: 1rem; }
+        .contract-section ul { margin-left: 1.5rem; }
+        .contract-section li { margin-bottom: 0.75rem; color: var(--text); }
+        .editable-li {
+            padding: 0.25rem;
+            border-bottom: 1px dashed var(--muted);
+            min-height: 1.2rem;
+            outline: none;
+        }
+        .editable-li:focus {
+            background: #fff;
+            border-bottom: 1px solid var(--primary);
+        }
+
+        .requirements-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem; }
+        .requirement-card { background: var(--light); padding: 1.5rem; border-radius: 8px; border-left: 4px solid var(--accent); }
+        .requirement-card h4 { color: var(--primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .requirement-card ul { list-style-type: none; margin-left: 0.5rem; padding-left: 0;}
+        .requirement-card li { margin-bottom: 0.5rem; position: relative; padding-left: 1.5rem; }
+        .requirement-card li::before {
+            content: '✓'; color: var(--success);
+            position: absolute; left: 0; top: 0; font-weight: 600;
+        }
+        .requirement-card p { color: var(--muted); font-style: italic; }
+
+        .signature-section { margin-top: 4rem; display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; page-break-inside: avoid; }
+        .signature-box { text-align: center; border-top: 2px solid #333; padding-top: 1rem; }
+        .signature-box strong { font-size: 1.1rem; }
+
+        /* Estilos para impresión */
+        @media print {
+            body { background: white; }
+            .header, .tabs, .document-footer { display: none !important; }
+            .container { margin: 0; padding: 0; }
+            .document-container {
+                box-shadow: none; border: none; padding: 0;
+            }
+            @page {
+                size: letter;
+                margin: 1.5cm;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1><i class="fa-solid fa-truck" style="color: var(--accent);"></i> Módulo de Logística</h1>
+            <div>
+                <a href="acceso.html" class="btn btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver al Dashboard</a>
+                <button class="btn btn-primary" onclick="printDocument()">
+                    <i class="fa-solid fa-print"></i> Imprimir Documento Actual
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab(event, 'asistencia')">
+                <i class="fa-solid fa-users"></i> Lista de Asistencia
+            </button>
+            <button class="tab-button" onclick="showTab(event, 'contrato')">
+                <i class="fa-solid fa-handshake"></i> Contrato de Aprendizaje
+            </button>
+            <button class="tab-button" onclick="showTab(event, 'requerimientos')">
+                <i class="fa-solid fa-tools"></i> Lista de Requerimientos
+            </button>
+        </div>
+
+        <div id="asistencia" class="tab-content active">
+            <div class="document-container printable">
+                <div class="document-header">
+                    <h2>LISTA DE ASISTENCIA</h2>
+                    <h3 id="asistencia-curso">Cargando...</h3>
+                </div>
+                <div class="document-info">
+                    <div><strong>Facilitador:</strong> <span id="asistencia-facilitador">-</span></div>
+                    <div><strong>Duración:</strong> <span id="asistencia-duracion">-</span> horas</div>
+                    <div><strong>Fechas:</strong> <span id="asistencia-fechas">-</span></div>
+                    <div><strong>Lugar:</strong> <span id="asistencia-lugar">-</span></div>
+                </div>
+                <table id="asistencia-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">No.</th>
+                            <th style="width: 50%;">Nombre Completo del Participante</th>
+                            <th style="width: 42%;">Firma</th>
+                        </tr>
+                    </thead>
+                    <tbody id="asistencia-tbody"></tbody>
+                </table>
+                <div class="signature-section">
+                    <div class="signature-box">
+                        <strong id="firma-facilitador">Nombre del Facilitador</strong><br>Firma del Facilitador
+                    </div>
+                    <div class="signature-box">
+                        <strong>Responsable del Grupo</strong><br>Nombre y Firma
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="contrato" class="tab-content">
+            <div class="document-container printable">
+                <div class="document-header">
+                    <h2>CONTRATO DE APRENDIZAJE</h2>
+                    <h3 id="contrato-curso">Cargando...</h3>
+                </div>
+                <div class="document-info">
+                    <div><strong>Facilitador:</strong> <span id="contrato-facilitador">-</span></div>
+                    <div><strong>Duración:</strong> <span id="contrato-duracion">-</span> horas</div>
+                    <div><strong>Fechas:</strong> <span id="contrato-fechas">-</span></div>
+                    <div><strong>Lugar:</strong> <span id="contrato-lugar">-</span></div>
+                </div>
+
+                <div class="contract-section">
+                    <h4>COMPROMISOS DEL FACILITADOR</h4>
+                    <ul contenteditable="true">
+                        <li>Cumplir con el objetivo y temario establecidos en la carta descriptiva.</li>
+                        <li>Proporcionar retroalimentación constructiva y oportuna.</li>
+                        <li>Fomentar un ambiente de aprendizaje respetuoso y participativo.</li>
+                        <li>Respetar los tiempos y horarios establecidos.</li>
+                        <li>Evaluar de manera objetiva con base en los criterios definidos.</li>
+                        <li class="editable-li">...</li>
+                        <li class="editable-li">...</li>
+                    </ul>
+                </div>
+
+                <div class="contract-section">
+                    <h4>COMPROMISOS DE LOS PARTICIPANTES</h4>
+                    <ul contenteditable="true">
+                        <li>Cumplir con el 100% de asistencia y puntualidad.</li>
+                        <li>Participar activamente en todas las actividades y dinámicas.</li>
+                        <li>Mantener el teléfono en modo silencio y atender asuntos personales fuera del aula/sesión.</li>
+                        <li>Respetar las opiniones de todos los compañeros.</li>
+                        <li>Realizar todas las evaluaciones y actividades solicitadas.</li>
+                        <li class="editable-li">...</li>
+                        <li class="editable-li">...</li>
+                    </ul>
+                </div>
+
+                <div class="contract-section">
+                    <h4>CRITERIOS DE EVALUACIÓN</h4>
+                    <ul>
+                        <li><strong>Evaluación Formativa:</strong> <span id="contrato-eval-form">-%</span></li>
+                        <li><strong>Evaluación Sumativa:</strong> <span id="contrato-eval-sum">-%</span>
+                        <li><strong>Evaluación de Satisfacción:</strong> <span id="contrato-eval-sat">-%</span></li>
+                        <li><strong>Calificación Mínima Aprobatoria:</strong> <span id="contrato-eval-min">-%</span></li>
+                    </ul>
+                </div>
+
+                <div class="signature-section">
+                    <div class="signature-box">
+                        <strong id="contrato-firma-facilitador">Nombre del Facilitador</strong><br>Firma del Facilitador
+                    </div>
+                </div>
+
+                <h4 style="text-align: center; margin-top: 3rem;">Firmas de Participantes</h4>
+                <table id="contrato-firmas-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">No.</th>
+                            <th style="width: 52%;">Nombre del Participante</th>
+                            <th style="width: 40%;">Firma de Conformidad</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contrato-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="requerimientos" class="tab-content">
+            <div class="document-container printable">
+                <div class="document-header">
+                    <h2>LISTA DE REQUERIMIENTOS</h2>
+                    <h3 id="req-curso">Cargando...</h3>
+                </div>
+                <div class="document-info">
+                    <div><strong>Facilitador:</strong> <span id="req-facilitador">-</span></div>
+                    <div><strong>Lugar:</strong> <span id="req-lugar">-</span></div>
+                    <div><strong>Participantes:</strong> <span id="req-participantes">-</span> personas</div>
+                    <div><strong>Duración:</strong> <span id="req-duracion">-</span> horas</div>
+                </div>
+
+                <div class="requirements-grid">
+                    <div class="requirement-card">
+                        <h4><i class="fa-solid fa-building"></i> Instalaciones, Mobiliario y Distribución</h4>
+                        <div id="req-instalaciones-content"><p>Cargando...</p></div>
+                    </div>
+                    <div class="requirement-card">
+                        <h4><i class="fa-solid fa-laptop"></i> Equipo de Apoyo y Distribución</h4>
+                        <div id="req-equipo-content"><p>Cargando...</p></div>
+                    </div>
+                    <div class="requirement-card">
+                        <h4><i class="fa-solid fa-box"></i> Materiales de Apoyo</h4>
+                        <div id="req-materiales-content"><p>Cargando...</p></div>
+                    </div>
+                     <div class="requirement-card">
+                        <h4><i class="fa-solid fa-users"></i> Requerimientos Humanos</h4>
+                        <div id="req-humanos-content"><p>Cargando...</p></div>
+                    </div>
+                </div>
+                <div class="requirement-card" style="margin-top: 2rem;">
+                    <h4><i class="fa-solid fa-pump-medical"></i> Material y Equipo (Salud/Seguridad/Higiene)</h4>
+                    <div id="req-seguridad-content"><p>Cargando...</p></div>
+                </div>
+
+                <div class="signature-section">
+                    <div class="signature-box">
+                        <strong>Responsable de Logística</strong><br>Nombre y Firma
+                    </div>
+                    <div class="signature-box">
+                        <strong>Facilitador (Revisa)</strong><br><span id="req-firma-facilitador">Nombre del Facilitador</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    let EC0301Manager;
+    let cartaData;
+
+    /**
+     * Carga todos los datos de la Carta Descriptiva y puebla los 3 documentos.
+     */
+    function loadLogisticaData() {
+        try {
+            cartaData = EC0301Manager.getData();
+            if (!cartaData || !cartaData.nombre) {
+                showMissingDataAlert();
+                return;
+            }
+
+            // 1. Extraer datos de la Carta
+            const curso = cartaData.nombre || 'Curso No Definido';
+            const facilitador = cartaData.facilitador || 'Facilitador No Definido';
+            const duracion = cartaData.duracion || '0';
+            const lugar = cartaData.lugar || 'Lugar No Definido';
+            const fechas = cartaData.fechas || 'Fechas No Definidas';
+            const participantes = parseInt(cartaData.num) || 10; // Default de 10
+            
+            // 2. Poblar "Lista de Asistencia"
+            $('asistencia-curso').textContent = curso;
+            $('asistencia-facilitador').textContent = facilitador;
+            $('asistencia-duracion').textContent = duracion;
+            $('asistencia-lugar').value = lugar; // Usar .value para inputs
+            $('asistencia-fechas').value = fechas; // Usar .value para inputs
+            $('firma-facilitador').textContent = facilitador;
+            generateAsistenciaTable(participantes, 'asistencia-tbody');
+
+            // 3. Poblar "Contrato de Aprendizaje"
+            $('contrato-curso').textContent = curso;
+            $('contrato-facilitador').textContent = facilitador;
+            $('contrato-duracion').textContent = duracion;
+            $('contrato-lugar').value = lugar; // Usar .value para inputs
+            $('contrato-fechas').value = fechas; // Usar .value para inputs
+            $('contrato-firma-facilitador').textContent = facilitador;
+            
+            // Poblar datos de evaluación (de la nueva carta)
+            if (cartaData.ev) {
+                $('contrato-eval-form').textContent = (cartaData.ev.form_pct || 'N/A') + '%';
+                $('contrato-eval-sum').textContent = (cartaData.ev.sum_pct || 'N/A') + '%';
+                $('contrato-eval-sat').textContent = (cartaData.ev.sat_pct || 'N/A') + '%';
+                $('contrato-eval-min').textContent = (cartaData.ev.min || 'N/A') + '%';
+            }
+            
+            generateAsistenciaTable(participantes, 'contrato-tbody');
+
+            // 4. Poblar "Lista de Requerimientos"
+            $('req-curso').textContent = curso;
+            $('req-facilitador').textContent = facilitador;
+            $('req-duracion').textContent = duracion;
+            $('req-participantes').textContent = participantes;
+            $('req-lugar').value = lugar; // Usar .value para inputs
+            $('req-firma-facilitador').textContent = facilitador;
+            
+            // Cargar requerimientos específicos (de la nueva carta)
+            loadRequerimientos(cartaData.rq || {});
+
+        } catch (error) {
+            console.error('Error cargando datos de logística:', error);
+            showMissingDataAlert();
+        }
+    }
+
+    /**
+     * Genera las filas de la tabla de asistencia/firmas.
+     * numParticipantes = Número base de la carta
+     * 5 = Renglones adicionales solicitados
+     */
+    function generateAsistenciaTable(numParticipantes, tableBodyId) {
+        const tbody = document.getElementById(tableBodyId);
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        const totalFilas = numParticipantes + 5; // Lógica de Participantes + 5 extras
+
+        for (let i = 1; i <= totalFilas; i++) {
+            const row = document.createElement('tr');
+            let baseStyle = (i > numParticipantes) ? 'background-color: #f0f0f0; font-style: italic;' : '';
+            
+            if (tableBodyId === 'asistencia-tbody') {
+                row.innerHTML = `
+                    <td style="text-align: center; font-weight: 600; ${baseStyle}">${i}</td>
+                    <td class="empty-row"></td>
+                    <td class="empty-row"></td>
+                    <td class="empty-row"></td>
+                `;
+            } else { // Para contrato-tbody
+                row.innerHTML = `
+                    <td style="text-align: center; font-weight: 600; ${baseStyle}">${i}</td>
+                    <td class="empty-row"></td>
+                    <td class="empty-row"></td>
+                `;
+            }
+            tbody.appendChild(row);
+        }
+    }
+    
+    /**
+     * Carga los datos de Requerimientos de la Carta Descriptiva
+     */
+    function loadRequerimientos(rqData) {
+        const formatReq = (data) => {
+            if (!data) return '<p style="color: var(--muted);">No especificado en carta descriptiva.</p>';
+            // Divide por nueva línea, y filtra líneas vacías
+            const list = data.split('\n').filter(item => item.trim()); 
+            return `<ul>${list.map(item => `<li>${item.trim()}</li>`).join('')}</ul>`;
+        };
+
+        // Mapeo a los IDs del nuevo formato de Carta Descriptiva
+        $('req-instalaciones-content').innerHTML = formatReq(rqData.instalaciones);
+        $('req-equipo-content').innerHTML = formatReq(rqData.equipo);
+        $('req-materiales-content').innerHTML = formatReq(rqData.materiales);
+        $('req-humanos-content').innerHTML = formatReq(rqData.humanos);
+        $('req-seguridad-content').innerHTML = formatReq(rqData.seguridad);
+    }
+
+    /**
+     * Muestra alerta si no se encuentran datos de la Carta Descriptiva
+     */
+    function showMissingDataAlert() {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Datos Incompletos',
+            html: 'No se encontraron datos. Por favor, completa y <strong>guarda</strong> primero la <strong>Carta Descriptiva</strong>.',
+            confirmButtonText: 'Ir a Carta Descriptiva',
+            confirmButtonColor: '#1E3A8A'
+        }).then(() => {
+            window.location.href = 'carta_descriptiva.html';
+        });
+    }
+
+    /**
+     * Cambia la pestaña visible
+     */
+    function showTab(event, tabName) {
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.classList.remove('active');
+        });
+        document.getElementById(tabName).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    /**
+     * Llama a la función de impresión del navegador
+     */
+    function printDocument() {
+        window.print();
+    }
+    
+    /**
+     * Genera un PDF (Función de ejemplo)
+     */
+    function generatePDF(documentType) {
+        // ... (Tu lógica de generatePDF) ...
+        Swal.fire('Función en desarrollo', 'La exportación a PDF se habilitará en futuras versiones.', 'info');
+    }
+    
+    // ========== UTILIDADES ==========
+    const $ = id => document.getElementById(id);
+    </script>
+</body>
+
+</html>
